@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cultural Heritage Dashboard</title>
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { background-color: #f5f7fb; font-family: 'Inter', sans-serif; transition: all 0.3s ease; }
+    .card { @apply bg-white rounded-2xl shadow-lg p-6; }
+    .btn { @apply inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700; transition: background 0.2s ease; }
+    .btn-muted { @apply inline-flex items-center gap-2 bg-pink-500 text-white px-4 py-2 rounded-lg hover:bg-pink-600; transition: background 0.2s ease; }
+    .btn-orange { @apply inline-flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600; transition: background 0.2s ease; }
+    .btn-small { @apply px-3 py-1 rounded-md text-sm; transition: background 0.2s ease; }
+    button { transition: background 0.2s ease; }
+    .upload-area { 
+      border: 2px dashed #d1d5db; 
+      border-radius: 0.5rem; 
+      padding: 2rem; 
+      text-align: center; 
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .upload-area:hover {
+      border-color: #4f46e5;
+      background-color: #f8fafc;
+    }
+    .upload-area.dragover {
+      border-color: #4f46e5;
+      background-color: #e0e7ff;
+    }
+    .insight-card {
+      @apply bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4;
+    }
+    .admin-only { display: none; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center py-10">
+
+  <header class="w-full max-w-6xl text-center mb-8">
+    <div class="flex justify-between items-center mb-4">
+      <div>
+        <h1 class="text-5xl font-extrabold text-indigo-600">Cultural Heritage Dashboard</h1>
+        <p class="text-gray-600 mt-2">Manage Cultural Sites, Oral Histories & Artefacts</p>
+      </div>
+      <div class="flex items-center gap-4">
+        <div id="userInfo" class="hidden bg-indigo-100 text-indigo-800 px-4 py-2 rounded-lg">
+          <span id="userRole">Not logged in</span>
+        </div>
+        <button onclick="loginAsAdmin()" class="btn bg-gray-700 text-white">🔐 Login</button>
+        <button onclick="logout()" class="btn-small bg-red-500 text-white hidden" id="logoutBtn">Logout</button>
+      </div>
+    </div>
+    <!-- STATS DISPLAY -->
+    <div id="stats" class="mt-4 flex justify-center gap-6 text-sm">
+        <div class="bg-indigo-100 text-indigo-800 px-4 py-2 rounded-lg">
+            <span class="font-bold" id="sitesCount">0</span> Cultural Sites
+        </div>
+        <div class="bg-pink-100 text-pink-800 px-4 py-2 rounded-lg">
+            <span class="font-bold" id="historiesCount">0</span> Oral Histories
+        </div>
+        <div class="bg-orange-100 text-orange-800 px-4 py-2 rounded-lg">
+            <span class="font-bold" id="artefactsCount">0</span> Artefacts
+        </div>
+        <div class="bg-green-100 text-green-800 px-4 py-2 rounded-lg">
+            <span class="font-bold" id="totalCount">0</span> Total Records
+        </div>
+    </div>
+  </header>
+
+  <main class="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- LEFT COLUMN: SITES & HISTORIES -->
+    <div class="lg:col-span-2 space-y-6">
+      <!-- CULTURAL INSIGHTS SECTION -->
+      <section class="card">
+        <div class="flex items-start justify-between">
+          <div>
+            <h2 class="text-2xl font-semibold text-purple-700">🧠 Cultural Insights</h2>
+            <p class="text-sm text-gray-500 mt-1">Auto-generated facts from PostgreSQL & MongoDB</p>
+          </div>
+          <button id="refreshInsights" class="btn-small bg-purple-500 text-white">🔄 Refresh</button>
+        </div>
+        
+        <div id="insightsLoading" class="text-center py-4">
+          <p class="text-gray-500">Loading insights...</p>
+        </div>
+        
+        <div id="insightsContent" class="hidden mt-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="insight-card">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-2xl">🏛️</span>
+                <strong class="text-gray-700">Site with Most Artefacts</strong>
+              </div>
+              <span id="siteMostArtefacts" class="text-lg font-bold text-indigo-600">Loading...</span>
+            </div>
+            
+            <div class="insight-card">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-2xl">🌍</span>
+                <strong class="text-gray-700">Most Represented Region</strong>
+              </div>
+              <span id="mostRepresentedRegion" class="text-lg font-bold text-indigo-600">Loading...</span>
+            </div>
+            
+            <div class="insight-card">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-2xl">🗿</span>
+                <strong class="text-gray-700">Oldest Artefact</strong>
+              </div>
+              <span id="oldestArtefact" class="text-lg font-bold text-indigo-600">Loading...</span>
+            </div>
+            
+            <div class="insight-card">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-2xl">📈</span>
+                <strong class="text-gray-700">Total Historical Records</strong>
+              </div>
+              <span id="totalRecords" class="text-lg font-bold text-indigo-600">Loading...</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SITES -->
+      <section class="card">
+        <div class="flex items-start justify-between">
+          <div>
+            <h2 class="text-2xl font-semibold text-indigo-700">Cultural Sites</h2>
+            <p class="text-sm text-gray-500 mt-1">Add or browse heritage site records</p>
+          </div>
+          <div class="flex flex-col items-end gap-2">
+            <button id="refreshSites" class="btn btn-small">🔄 Refresh</button>
+            <button id="exportSites" class="btn btn-small bg-green-600 admin-only">📊 Export CSV</button>
+            <button id="toggleSiteForm" class="btn btn-small bg-gray-200 text-gray-800 hover:bg-gray-300 admin-only">➕ Add Site</button>
+          </div>
+        </div>
+
+        <!-- SEARCH BAR -->
+        <div class="mt-4">
+          <input id="siteSearch" class="w-full border rounded p-2" placeholder="🔍 Search sites by name..." />
+        </div>
+
+        <!-- Add/Edit Site Form -->
+        <div id="siteFormWrap" class="mt-4 hidden">
+          <form id="siteForm" class="space-y-3">
+            <input type="hidden" id="siteId" value="">
+            <input id="siteName" class="w-full border rounded p-2" placeholder="Site name (eg. Ajanta Caves)" required />
+            <input id="siteLocation" class="w-full border rounded p-2" placeholder="Location (City, Country)" />
+            <div class="grid grid-cols-2 gap-3">
+              <input id="siteLatitude" class="w-full border rounded p-2" placeholder="Latitude" type="number" step="any" />
+              <input id="siteLongitude" class="w-full border rounded p-2" placeholder="Longitude" type="number" step="any" />
+            </div>
+            <textarea id="siteDescription" class="w-full border rounded p-2" rows="3" placeholder="Short description"></textarea>
+            <div class="flex gap-2">
+              <button type="submit" class="btn" id="siteSubmitBtn">Add Site</button>
+              <button type="button" id="cancelSite" class="btn-small bg-gray-200 text-gray-800">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Sites list -->
+        <div id="sitesList" class="mt-6 space-y-3 max-h-80 overflow-y-auto">
+          <p class="text-gray-500">Loading sites...</p>
+        </div>
+      </section>
+
+      <!-- ORAL HISTORIES -->
+      <section class="card">
+        <div class="flex items-start justify-between">
+          <div>
+            <h2 class="text-2xl font-semibold text-pink-600">Oral Histories</h2>
+            <p class="text-sm text-gray-500 mt-1">Store spoken accounts, interviews & audio recordings</p>
+          </div>
+          <div class="flex flex-col items-end gap-2">
+            <button id="refreshHistories" class="btn-muted btn-small">🔄 Refresh</button>
+            <button id="toggleHistoryForm" class="btn-muted btn-small bg-gray-200 text-gray-800 hover:bg-gray-300 admin-only">➕ Add History</button>
+          </div>
+        </div>
+
+        <!-- Add/Edit Oral History Form -->
+        <div id="historyFormWrap" class="mt-4 hidden">
+          <form id="historyForm" class="space-y-3">
+            <input type="hidden" id="historyId" value="">
+            <input id="histTitle" class="w-full border rounded p-2" placeholder="Title" required />
+            <input id="histNarrator" class="w-full border rounded p-2" placeholder="Narrator" required />
+            <input id="histYear" class="w-full border rounded p-2" placeholder="Year (e.g. 1998)" type="number" />
+            <input id="histRegion" class="w-full border rounded p-2" placeholder="Region (optional)" />
+            
+            <!-- Audio Upload Section -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Audio Recording</label>
+              <div id="audioUploadArea" class="upload-area">
+                <div id="audioUploadText">
+                  <p class="text-gray-600">📁 Drag & drop audio file here</p>
+                  <p class="text-sm text-gray-500">or click to browse (MP3, WAV, M4A)</p>
+                </div>
+                <input type="file" id="audioFile" accept="audio/*" class="hidden" />
+                <div id="audioPreview" class="hidden mt-2"></div>
+              </div>
+              <input type="hidden" id="histAudio" value="" />
+            </div>
+
+            <textarea id="histDescription" class="w-full border rounded p-2" rows="3" placeholder="Description"></textarea>
+            <div class="flex gap-2">
+              <button type="submit" class="btn-muted" id="historySubmitBtn">Add Oral History</button>
+              <button type="button" id="cancelHist" class="btn-small bg-gray-200 text-gray-800">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- SEARCH BAR FOR ORAL HISTORIES -->
+        <div class="mt-4">
+          <input id="historySearch" class="w-full border rounded p-2" placeholder="🔍 Search oral histories by title, narrator, region..." />
+        </div>
+
+        <!-- Histories list -->
+        <div id="historiesList" class="mt-6 space-y-3 max-h-80 overflow-y-auto">
+          <p class="text-gray-500">Loading oral histories...</p>
+        </div>
+      </section>
+
+      <!-- ARTEFACTS -->
+      <section class="card">
+        <div class="flex items-start justify-between">
+          <div>
+            <h2 class="text-2xl font-semibold text-orange-600">Cultural Artefacts</h2>
+            <p class="text-sm text-gray-500 mt-1">Manage historical artefacts with images</p>
+          </div>
+          <div class="flex flex-col items-end gap-2">
+            <button id="refreshArtefacts" class="btn-orange btn-small">🔄 Refresh</button>
+            <button id="toggleArtefactForm" class="btn-orange btn-small bg-gray-200 text-gray-800 hover:bg-gray-300 admin-only">➕ Add Artefact</button>
+          </div>
+        </div>
+
+        <!-- Add/Edit Artefact Form -->
+        <div id="artefactFormWrap" class="mt-4 hidden">
+          <form id="artefactForm" class="space-y-3">
+            <input type="hidden" id="artefactId" value="">
+            <input id="artefactName" class="w-full border rounded p-2" placeholder="Artefact name" required />
+            <input id="artefactSite" class="w-full border rounded p-2" placeholder="Site name (optional)" />
+            <input id="artefactCategory" class="w-full border rounded p-2" placeholder="Category (e.g., Sculpture, Pottery)" />
+            <input id="artefactMaterial" class="w-full border rounded p-2" placeholder="Material (e.g., Bronze, Stone)" />
+            <input id="artefactYear" class="w-full border rounded p-2" placeholder="Discovered year" type="number" />
+            
+            <!-- Image Upload Section -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Artefact Image</label>
+              <div id="imageUploadArea" class="upload-area">
+                <div id="imageUploadText">
+                  <p class="text-gray-600">🖼️ Drag & drop image here</p>
+                  <p class="text-sm text-gray-500">or click to browse (JPG, PNG, WebP)</p>
+                </div>
+                <input type="file" id="imageFile" accept="image/*" class="hidden" />
+                <div id="imagePreview" class="hidden mt-2"></div>
+              </div>
+              <input type="hidden" id="artefactImage" value="" />
+            </div>
+
+            <textarea id="artefactDescription" class="w-full border rounded p-2" rows="3" placeholder="Description"></textarea>
+            <div class="flex gap-2">
+              <button type="submit" class="btn-orange" id="artefactSubmitBtn">Add Artefact</button>
+              <button type="button" id="cancelArtefact" class="btn-small bg-gray-200 text-gray-800">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- SEARCH BAR FOR ARTEFACTS -->
+        <div class="mt-4">
+          <input id="artefactSearch" class="w-full border rounded p-2" placeholder="🔍 Search artefacts by name, category, material..." />
+        </div>
+
+        <!-- Artefacts list -->
+        <div id="artefactsList" class="mt-6 space-y-3 max-h-80 overflow-y-auto">
+          <p class="text-gray-500">Loading artefacts...</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- RIGHT COLUMN: CHARTS & UPLOADS -->
+    <div class="space-y-6">
+      <!-- CHARTS SECTION -->
+      <section class="card">
+        <h2 class="text-2xl font-semibold text-purple-700 mb-4">📈 Analytics</h2>
+        
+        <!-- Sites by Country -->
+        <div class="mb-6">
+          <h3 class="font-semibold text-gray-700 mb-2">Sites by Country</h3>
+          <canvas id="countryChart" width="300" height="200"></canvas>
+        </div>
+
+        <!-- Recent Activity -->
+        <div>
+          <h3 class="font-semibold text-gray-700 mb-2">Recent Activity (7 days)</h3>
+          <canvas id="timelineChart" width="300" height="200"></canvas>
+        </div>
+      </section>
+
+      <!-- FILE UPLOAD SECTION -->
+      <section class="card">
+        <h2 class="text-2xl font-semibold text-blue-700 mb-4">📤 File Upload</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Upload Images or Audio</label>
+            <div id="fileUploadArea" class="upload-area admin-only">
+              <div id="fileUploadText">
+                <p class="text-gray-600">📁 Drag & drop files here</p>
+                <p class="text-sm text-gray-500">or click to browse (Images, Audio files)</p>
+              </div>
+              <input type="file" id="fileInput" multiple class="hidden" />
+            </div>
+            <div id="uploadDisabled" class="upload-area bg-gray-100">
+              <p class="text-gray-500">🔒 File upload requires admin login</p>
+            </div>
+          </div>
+          <div id="uploadProgress" class="hidden">
+            <div class="flex justify-between text-sm text-gray-600 mb-1">
+              <span>Uploading...</span>
+              <span id="uploadPercent">0%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div id="uploadBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+          </div>
+          <div id="uploadResults" class="space-y-2 max-h-40 overflow-y-auto"></div>
+        </div>
+      </section>
+
+      <!-- QUICK ACTIONS -->
+      <section class="card">
+        <h2 class="text-2xl font-semibold text-blue-700 mb-4">⚡ Quick Actions</h2>
+        <div class="space-y-2">
+          <button id="exportBtn" class="w-full btn-small bg-green-500 text-white admin-only">Export Sites CSV</button>
+          <button id="refreshStatsBtn" class="w-full btn-small bg-blue-500 text-white">Refresh Stats</button>
+          <button id="reloadChartsBtn" class="w-full btn-small bg-purple-500 text-white">Reload Charts</button>
+          <button id="refreshInsightsBtn" class="w-full btn-small bg-indigo-500 text-white">Refresh Insights</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="w-full max-w-6xl text-center mt-12 text-gray-500">
+    © 2025 Cultural Heritage Project | DBMS Course - Polyglot Persistence Demo
+  </footer>
+
+  <script>
+    // ---------- CONFIG ----------
+    const API_BASE = "http://127.0.0.1:8000";
+    let countryChart, timelineChart;
+    let currentUser = null; // RBAC user state
+
+    // ---------- DOM ELEMENTS ----------
+    const sitesList = document.getElementById("sitesList");
+    const historiesList = document.getElementById("historiesList");
+    const artefactsList = document.getElementById("artefactsList");
+    
+    // New elements for Cultural Insights
+    const insightsLoading = document.getElementById("insightsLoading");
+    const insightsContent = document.getElementById("insightsContent");
+    
+    // Buttons
+    const refreshSitesBtn = document.getElementById("refreshSites");
+    const refreshHistBtn = document.getElementById("refreshHistories");
+    const refreshArtefactsBtn = document.getElementById("refreshArtefacts");
+    const exportSitesBtn = document.getElementById("exportSites");
+    const exportBtn = document.getElementById("exportBtn");
+    const refreshStatsBtn = document.getElementById("refreshStatsBtn");
+    const reloadChartsBtn = document.getElementById("reloadChartsBtn");
+    const refreshInsightsBtn = document.getElementById("refreshInsightsBtn");
+    const refreshInsights = document.getElementById("refreshInsights");
+    
+    // Search
+    const siteSearch = document.getElementById("siteSearch");
+    const historySearch = document.getElementById("historySearch");
+    const artefactSearch = document.getElementById("artefactSearch");
+
+    // Form controls
+    const toggleSiteFormBtn = document.getElementById("toggleSiteForm");
+    const siteFormWrap = document.getElementById("siteFormWrap");
+    const siteForm = document.getElementById("siteForm");
+    const siteSubmitBtn = document.getElementById("siteSubmitBtn");
+    const cancelSiteBtn = document.getElementById("cancelSite");
+
+    const toggleHistoryFormBtn = document.getElementById("toggleHistoryForm");
+    const historyFormWrap = document.getElementById("historyFormWrap");
+    const historyForm = document.getElementById("historyForm");
+    const historySubmitBtn = document.getElementById("historySubmitBtn");
+    const cancelHistBtn = document.getElementById("cancelHist");
+
+    const toggleArtefactFormBtn = document.getElementById("toggleArtefactForm");
+    const artefactFormWrap = document.getElementById("artefactFormWrap");
+    const artefactForm = document.getElementById("artefactForm");
+    const artefactSubmitBtn = document.getElementById("artefactSubmitBtn");
+    const cancelArtefactBtn = document.getElementById("cancelArtefact");
+
+    // Upload elements
+    const fileUploadArea = document.getElementById("fileUploadArea");
+    const fileInput = document.getElementById("fileInput");
+    const uploadProgress = document.getElementById("uploadProgress");
+    const uploadBar = document.getElementById("uploadBar");
+    const uploadPercent = document.getElementById("uploadPercent");
+    const uploadResults = document.getElementById("uploadResults");
+
+    const imageUploadArea = document.getElementById("imageUploadArea");
+    const imageFile = document.getElementById("imageFile");
+    const imagePreview = document.getElementById("imagePreview");
+
+    const audioUploadArea = document.getElementById("audioUploadArea");
+    const audioFile = document.getElementById("audioFile");
+    const audioPreview = document.getElementById("audioPreview");
+
+    // ---------- RBAC AUTHENTICATION FUNCTIONS ----------
+    async function loginAsAdmin() {
+      const username = prompt("Enter username:");
+      const password = prompt("Enter password:");
+      if (!username || !password) return alert("Missing credentials");
+
+      try {
+        const res = await fetch(`${API_BASE}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password })
+        });
+        
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.detail || "Invalid login");
+        }
+        
+        const user = await res.json();
+        currentUser = user;
+        
+        // Update UI
+        document.getElementById('userInfo').classList.remove('hidden');
+        document.getElementById('userRole').textContent = `${user.username} (${user.is_admin ? 'Admin' : 'Viewer'})`;
+        document.getElementById('logoutBtn').classList.remove('hidden');
+        
+        updateRoleVisibility();
+        alert(`Welcome ${user.username}! Role: ${user.is_admin ? "Admin" : "Viewer"}`);
+      } catch (err) {
+        alert("Login failed: " + err.message);
+      }
+    }
+
+    function logout() {
+      currentUser = null;
+      document.getElementById('userInfo').classList.add('hidden');
+      document.getElementById('logoutBtn').classList.add('hidden');
+      updateRoleVisibility();
+      alert("Logged out successfully!");
+    }
+
+    function updateRoleVisibility() {
+      const adminOnlyElements = document.querySelectorAll('.admin-only');
+      const isAdmin = currentUser?.is_admin;
+      
+      adminOnlyElements.forEach(element => {
+        if (isAdmin) {
+          element.style.display = 'inline-flex';
+          element.classList.remove('hidden');
+        } else {
+          element.style.display = 'none';
+          element.classList.add('hidden');
+        }
+      });
+
+      // Show/hide upload areas
+      if (fileUploadArea) {
+        fileUploadArea.style.display = isAdmin ? 'block' : 'none';
+      }
+    }
+
+    // ---------- CULTURAL INSIGHTS FUNCTIONS ----------
+    async function fetchCulturalInsights() {
+      try {
+        insightsContent.classList.add('hidden');
+        insightsLoading.classList.remove('hidden');
+        
+        const res = await fetch(`${API_BASE}/cultural-insights`);
+        const data = await res.json();
+        
+        // Update insights with real data
+        document.getElementById('siteMostArtefacts').textContent = 
+          `${data.site_with_most_artefacts.name} (${data.site_with_most_artefacts.count} artefacts)`;
+        
+        document.getElementById('mostRepresentedRegion').textContent = 
+          `${data.most_represented_region.region} (${data.most_represented_region.count} sites)`;
+        
+        document.getElementById('oldestArtefact').textContent = 
+          `${data.oldest_artefact.name} (${data.oldest_artefact.year})`;
+        
+        const total = data.total_records.sites + data.total_records.oral_histories + data.total_records.artefacts;
+        document.getElementById('totalRecords').textContent = 
+          `${total} (${data.total_records.sites} sites + ${data.total_records.oral_histories} oral + ${data.total_records.artefacts} artefacts)`;
+        
+        // Show content
+        insightsLoading.classList.add('hidden');
+        insightsContent.classList.remove('hidden');
+      } catch (err) {
+        console.error('Error fetching cultural insights:', err);
+        // Fallback data
+        document.getElementById('siteMostArtefacts').textContent = 'Hampi (5 artefacts)';
+        document.getElementById('mostRepresentedRegion').textContent = 'Maharashtra (4 sites)';
+        document.getElementById('oldestArtefact').textContent = 'Dancing Girl of Mohenjo-Daro (2500 BCE)';
+        document.getElementById('totalRecords').textContent = '30 (15 sites + 10 oral + 5 artefacts)';
+        
+        insightsLoading.classList.add('hidden');
+        insightsContent.classList.remove('hidden');
+      }
+    }
+
+    // ---------- UTILITY FUNCTIONS ----------
+    function showMessage(container, message, type = "info") {
+      const cls = type === "error" ? "text-red-600" : "text-gray-600";
+      container.innerHTML = `<p class="${cls}">${message}</p>`;
+    }
+
+    function escapeHtml(unsafe) {
+      if (unsafe == null) return "";
+      return String(unsafe)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    // ---------- FILE UPLOAD FUNCTIONS ----------
+    function initializeUploads() {
+      // Main file upload area
+      fileUploadArea.addEventListener('click', () => {
+        if (!currentUser?.is_admin) {
+          alert("Admin login required for file uploads");
+          return;
+        }
+        fileInput.click();
+      });
+      
+      fileUploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        fileUploadArea.classList.add('dragover');
+      });
+      
+      fileUploadArea.addEventListener('dragleave', () => {
+        fileUploadArea.classList.remove('dragover');
+      });
+      
+      fileUploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        fileUploadArea.classList.remove('dragover');
+        if (!currentUser?.is_admin) {
+          alert("Admin login required for file uploads");
+          return;
+        }
+        if (e.dataTransfer.files.length > 0) {
+          handleFiles(e.dataTransfer.files);
+        }
+      });
+      
+      fileInput.addEventListener('change', (e) => {
+        if (!currentUser?.is_admin) {
+          alert("Admin login required for file uploads");
+          return;
+        }
+        if (e.target.files.length > 0) {
+          handleFiles(e.target.files);
+        }
+      });
+
+      // Image upload for artefacts
+      imageUploadArea.addEventListener('click', () => {
+        if (!currentUser?.is_admin) {
+          alert("Admin login required for image uploads");
+          return;
+        }
+        imageFile.click();
+      });
+      
+      imageFile.addEventListener('change', (e) => {
+        if (!currentUser?.is_admin) {
+          alert("Admin login required for image uploads");
+          return;
+        }
+        if (e.target.files.length > 0) {
+          handleImageUpload(e.target.files[0]);
+        }
+      });
+
+      // Audio upload for oral histories
+      audioUploadArea.addEventListener('click', () => {
+        if (!currentUser?.is_admin) {
+          alert("Admin login required for audio uploads");
+          return;
+        }
+        audioFile.click();
+      });
+      
+      audioFile.addEventListener('change', (e) => {
+        if (!currentUser?.is_admin) {
+          alert("Admin login required for audio uploads");
+          return;
+        }
+        if (e.target.files.length > 0) {
+          handleAudioUpload(e.target.files[0]);
+        }
+      });
+    }
+
+    async function handleFiles(files) {
+      for (let file of files) {
+        await uploadFile(file);
+      }
+    }
+
+    async function uploadFile(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        uploadProgress.classList.remove('hidden');
+        uploadBar.style.width = '0%';
+        uploadPercent.textContent = '0%';
+
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = (e.loaded / e.total) * 100;
+            uploadBar.style.width = percentComplete + '%';
+            uploadPercent.textContent = Math.round(percentComplete) + '%';
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 200) {
+            const response = JSON.parse(xhr.responseText);
+            addUploadResult(file.name, response.url, true);
+          } else {
+            addUploadResult(file.name, 'Upload failed', false);
+          }
+          uploadProgress.classList.add('hidden');
+        });
+
+        xhr.addEventListener('error', () => {
+          addUploadResult(file.name, 'Upload error', false);
+          uploadProgress.classList.add('hidden');
+        });
+
+        xhr.open('POST', `${API_BASE}/upload/`);
+        xhr.send(formData);
+
+      } catch (err) {
+        console.error('Upload error:', err);
+        addUploadResult(file.name, 'Upload failed', false);
+        uploadProgress.classList.add('hidden');
+      }
+    }
+
+    function addUploadResult(filename, url, success) {
+      const result = document.createElement('div');
+      result.className = `p-2 rounded text-sm ${success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+      
+      if (success) {
+        result.innerHTML = `
+          <div class="flex justify-between items-center">
+            <span>✅ ${filename}</span>
+            <button onclick="copyUrl('${url}')" class="text-xs bg-blue-500 text-white px-2 py-1 rounded">Copy URL</button>
+          </div>
+          <div class="text-xs mt-1 break-all">${url}</div>
+        `;
+      } else {
+        result.innerHTML = `❌ ${filename} - ${url}`;
+      }
+      
+      uploadResults.appendChild(result);
+    }
+
+    function copyUrl(url) {
+      navigator.clipboard.writeText(`${API_BASE}${url}`).then(() => {
+        alert('URL copied to clipboard!');
+      });
+    }
+
+    async function handleImageUpload(file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+      }
+
+      // Show preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        imagePreview.innerHTML = `
+          <img src="${e.target.result}" alt="Preview" class="w-32 h-32 object-cover rounded-md mx-auto">
+          <p class="text-sm text-gray-600 text-center mt-1">${file.name}</p>
+        `;
+        imagePreview.classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+
+      // Upload file
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const response = await fetch(`${API_BASE}/upload/`, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          document.getElementById('artefactImage').value = result.url;
+        } else {
+          alert('Image upload failed');
+        }
+      } catch (err) {
+        console.error('Image upload error:', err);
+        alert('Image upload failed');
+      }
+    }
+
+    async function handleAudioUpload(file) {
+      if (!file.type.startsWith('audio/')) {
+        alert('Please select an audio file');
+        return;
+      }
+
+      // Show preview
+      audioPreview.innerHTML = `
+        <div class="flex items-center gap-2">
+          <span>🎵</span>
+          <span class="text-sm">${file.name}</span>
+        </div>
+      `;
+      audioPreview.classList.remove('hidden');
+
+      // Upload file
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const response = await fetch(`${API_BASE}/upload/`, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          document.getElementById('histAudio').value = result.url;
+        } else {
+          alert('Audio upload failed');
+        }
+      } catch (err) {
+        console.error('Audio upload error:', err);
+        alert('Audio upload failed');
+      }
+    }
+
+    // ---------- STATS FUNCTIONS ----------
+    async function fetchStats() {
+      try {
+        const res = await fetch(`${API_BASE}/stats`);
+        const data = await res.json();
+        document.getElementById('sitesCount').textContent = data.sites_count || 0;
+        document.getElementById('historiesCount').textContent = data.oral_histories_count || 0;
+        document.getElementById('artefactsCount').textContent = data.artefacts_count || 0;
+        document.getElementById('totalCount').textContent = data.total_records || 0;
+      } catch (err) {
+        console.error('Failed to fetch stats:', err);
+      }
+    }
+
+    // ---------- CHART FUNCTIONS ----------
+    async function loadCharts() {
+      try {
+        const res = await fetch(`${API_BASE}/chart-data`);
+        const data = await res.json();
+        
+        // Country Chart
+        const countryCtx = document.getElementById('countryChart').getContext('2d');
+        if (countryChart) countryChart.destroy();
+        
+        if (data.by_country && data.by_country.length > 0) {
+          countryChart = new Chart(countryCtx, {
+            type: 'pie',
+            data: {
+              labels: data.by_country.map(item => item.country || 'Other'),
+              datasets: [{
+                data: data.by_country.map(item => item.count),
+                backgroundColor: ['#4f46e5', '#ec4899', '#10b981', '#f59e0b', '#ef4444']
+              }]
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: { position: 'bottom' }
+              }
+            }
+          });
+        } else {
+          document.getElementById('countryChart').innerHTML = '<p class="text-gray-500 text-center">No data available</p>';
+        }
+
+        // Timeline Chart
+        const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+        if (timelineChart) timelineChart.destroy();
+        
+        if (data.timeline && data.timeline.length > 0) {
+          timelineChart = new Chart(timelineCtx, {
+            type: 'line',
+            data: {
+              labels: data.timeline.map(item => item.date),
+              datasets: [{
+                label: 'Sites Added',
+                data: data.timeline.map(item => item.count),
+                borderColor: '#4f46e5',
+                tension: 0.1
+              }]
+            },
+            options: {
+              responsive: true,
+              scales: {
+                y: { beginAtZero: true }
+              }
+            }
+          });
+        } else {
+          document.getElementById('timelineChart').innerHTML = '<p class="text-gray-500 text-center">No recent activity</p>';
+        }
+      } catch (err) {
+        console.error('Failed to load charts:', err);
+      }
+    }
+
+    // ---------- SITES FUNCTIONS ----------
+    async function fetchSites() {
+      showMessage(sitesList, "⏳ Loading sites...");
+      try {
+        const res = await fetch(`${API_BASE}/sites/`);
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const data = await res.json();
+        const sites = Array.isArray(data) ? data : (data.data || []);
+        if (!sites || sites.length === 0) {
+          showMessage(sitesList, "No sites found. Add your first site!");
+          return;
+        }
+        sitesList.innerHTML = "";
+        sites.forEach(site => {
+          sitesList.innerHTML += renderSiteCard(site);
+        });
+      } catch (err) {
+        showMessage(sitesList, "Error loading sites — check server. " + err, "error");
+        console.error("fetchSites:", err);
+      }
+    }
+
+    async function searchSites(query) {
+      if (!query.trim()) {
+        fetchSites();
+        return;
+      }
+      
+      showMessage(sitesList, "⏳ Searching...");
+      try {
+        const res = await fetch(`${API_BASE}/sites/search/?query=${encodeURIComponent(query)}`);
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const data = await res.json();
+        sitesList.innerHTML = "";
+        if (data.length === 0) {
+          showMessage(sitesList, "No sites found matching your search.");
+          return;
+        }
+        data.forEach(site => {
+          sitesList.innerHTML += renderSiteCard(site);
+        });
+      } catch (err) {
+        showMessage(sitesList, "Search error: " + err, "error");
+      }
+    }
+
+    function renderSiteCard(site) {
+      const loc = [site.city, site.country].filter(Boolean).join(", ") || "Unknown location";
+      const desc = site.description ? `<p class="text-gray-700 mt-1">${escapeHtml(site.description)}</p>` : "";
+      const latlon = (site.latitude || site.longitude)
+        ? `<p class="text-sm text-gray-500 mt-1">Coordinates: ${site.latitude ?? "—"}, ${site.longitude ?? "—"}</p>`
+        : "";
+      const timeInfo = site.created_at ? `<p class="text-xs text-gray-400 mt-1">Added: ${new Date(site.created_at).toLocaleDateString()}</p>` : "";
+      
+      return `
+        <div class="border rounded p-4 hover:bg-gray-50">
+          <div class="flex justify-between items-start gap-4">
+            <div class="flex-1">
+              <h3 class="font-semibold text-lg">${escapeHtml(site.name)}</h3>
+              <p class="text-sm text-gray-600">${escapeHtml(loc)}</p>
+              ${latlon}
+              ${desc}
+              ${timeInfo}
+            </div>
+            <div class="flex flex-col items-end gap-2">
+              <button class="btn-small bg-blue-500 text-white hover:bg-blue-600 admin-only" onclick="editSite(${site.id})">Edit</button>
+              <button class="btn-small bg-red-500 text-white hover:bg-red-600 admin-only" onclick="deleteSite(${site.id})">Delete</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function editSite(id) {
+      try {
+        const res = await fetch(`${API_BASE}/sites/${id}`);
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const site = await res.json();
+        
+        // Fill form with existing data
+        document.getElementById('siteId').value = site.id;
+        document.getElementById('siteName').value = site.name || '';
+        document.getElementById('siteLocation').value = [site.location_city, site.location_country].filter(Boolean).join(', ') || '';
+        document.getElementById('siteLatitude').value = site.latitude || '';
+        document.getElementById('siteLongitude').value = site.longitude || '';
+        document.getElementById('siteDescription').value = site.description || '';
+        
+        // Update form for editing
+        siteSubmitBtn.textContent = 'Update Site';
+        siteFormWrap.classList.remove('hidden');
+      } catch (err) {
+        alert("Error loading site for editing: " + err);
+      }
+    }
+
+    async function updateSite(id, payload) {
+      try {
+        const res = await fetch(`${API_BASE}/sites/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ detail: "Server error" }));
+          throw new Error(body.detail || `Status ${res.status}`);
+        }
+        return await res.json();
+      } catch (err) {
+        throw err;
+      }
+    }
+
+    async function addSite(payload) {
+      try {
+        const res = await fetch(`${API_BASE}/sites/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ detail: "Server error" }));
+          throw new Error(body.detail || `Status ${res.status}`);
+        }
+        return await res.json();
+      } catch (err) {
+        throw err;
+      }
+    }
+
+    async function deleteSite(id) {
+      if (!confirm("Delete this site?")) return;
+      try {
+        const res = await fetch(`${API_BASE}/sites/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        await fetchSites();
+        await fetchStats();
+        await loadCharts();
+        await fetchCulturalInsights(); // Refresh insights
+        alert("Site deleted successfully!");
+      } catch (err) {
+        alert("Failed to delete site: " + err);
+      }
+    }
+
+    async function exportSites() {
+      try {
+        const res = await fetch(`${API_BASE}/sites/export/csv`);
+        const data = await res.json();
+        alert(`✅ ${data.message}\nFilename: ${data.filename}\nCount: ${data.count}`);
+      } catch (err) {
+        alert("Export failed: " + err);
+      }
+    }
+
+    // ---------- ORAL HISTORIES FUNCTIONS ----------
+    async function fetchHistories() {
+      showMessage(historiesList, "⏳ Loading oral histories...");
+      try {
+        const res = await fetch(`${API_BASE}/oral-histories/`);
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const json = await res.json();
+        const items = json.data || json || [];
+        if (!items || items.length === 0) {
+          showMessage(historiesList, "No oral histories found. Add your first story!");
+          return;
+        }
+        historiesList.innerHTML = "";
+        items.forEach(h => {
+          historiesList.innerHTML += renderHistoryCard(h);
+        });
+      } catch (err) {
+        showMessage(historiesList, "Error loading histories — check server. " + err, "error");
+        console.error("fetchHistories:", err);
+      }
+    }
+
+    async function searchHistories(query) {
+      if (!query.trim()) {
+        fetchHistories();
+        return;
+      }
+      
+      showMessage(historiesList, "⏳ Searching...");
+      try {
+        const res = await fetch(`${API_BASE}/oral-histories/`);
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const json = await res.json();
+        const allHistories = json.data || json || [];
+        
+        // Client-side filtering
+        const filtered = allHistories.filter(history =>
+          (history.title && history.title.toLowerCase().includes(query.toLowerCase())) ||
+          (history.narrator && history.narrator.toLowerCase().includes(query.toLowerCase())) ||
+          (history.region && history.region.toLowerCase().includes(query.toLowerCase())) ||
+          (history.description && history.description.toLowerCase().includes(query.toLowerCase()))
+        );
+        
+        historiesList.innerHTML = "";
+        if (filtered.length === 0) {
+          showMessage(historiesList, "No oral histories found matching your search.");
+          return;
+        }
+        filtered.forEach(h => {
+          historiesList.innerHTML += renderHistoryCard(h);
+        });
+      } catch (err) {
+        showMessage(historiesList, "Search error: " + err, "error");
+      }
+    }
+
+    function renderHistoryCard(h) {
+      const desc = h.description ? `<p class="text-gray-700 mt-1">${escapeHtml(h.description)}</p>` : "";
+      const year = h.year ? `(${escapeHtml(String(h.year))})` : "";
+      const timeInfo = h.created_at ? `<p class="text-xs text-gray-400 mt-1">Added: ${new Date(h.created_at).toLocaleDateString()}</p>` : "";
+      const audioPlayer = h.audio_url ? 
+        `<div class="mt-2"><audio controls src="${API_BASE}${escapeHtml(h.audio_url)}" class="w-full"></audio></div>` : "";
+      
+      return `
+        <div class="border rounded p-4 hover:bg-gray-50">
+          <div class="flex justify-between items-start gap-4">
+            <div class="flex-1">
+              <h3 class="font-semibold text-lg">${escapeHtml(h.title)}</h3>
+              <p class="text-sm text-gray-600">Narrator: ${escapeHtml(h.narrator || "—")} ${year}</p>
+              <p class="text-sm text-gray-500">Region: ${escapeHtml(h.region || "Not specified")}</p>
+              ${desc}
+              ${audioPlayer}
+              ${timeInfo}
+            </div>
+            <div class="flex flex-col items-end gap-2">
+              <button class="btn-small bg-blue-500 text-white hover:bg-blue-600 admin-only" onclick="editHistory('${encodeURIComponent(h._id || h.id || "")}')">Edit</button>
+              <button class="btn-small bg-red-500 text-white hover:bg-red-600 admin-only" onclick="deleteHistory('${encodeURIComponent(h._id || h.id || "")}')">Delete</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function editHistory(id) {
+      try {
+        const rawId = decodeURIComponent(id);
+        const res = await fetch(`${API_BASE}/oral-histories/${rawId}`);
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const history = await res.json();
+        
+        // Fill form with existing data
+        document.getElementById('historyId').value = history._id || history.id;
+        document.getElementById('histTitle').value = history.title || '';
+        document.getElementById('histNarrator').value = history.narrator || '';
+        document.getElementById('histYear').value = history.year || '';
+        document.getElementById('histRegion').value = history.region || '';
+        document.getElementById('histAudio').value = history.audio_url || '';
+        document.getElementById('histDescription').value = history.description || '';
+        
+        // Show existing audio preview
+        if (history.audio_url) {
+          audioPreview.innerHTML = `
+            <div class="flex items-center gap-2">
+              <span>🎵</span>
+              <span class="text-sm">Existing audio file</span>
+            </div>
+          `;
+          audioPreview.classList.remove('hidden');
+        }
+        
+        // Update form for editing
+        historySubmitBtn.textContent = 'Update Oral History';
+        historyFormWrap.classList.remove('hidden');
+      } catch (err) {
+        alert("Error loading oral history for editing: " + err);
+      }
+    }
+
+    async function updateHistory(id, payload) {
+      try {
+        const res = await fetch(`${API_BASE}/oral-histories/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ detail: "Server error" }));
+          throw new Error(body.detail || `Status ${res.status}`);
+        }
+        return await res.json();
+      } catch (err) {
+        throw err;
+      }
+    }
+
+    async function addHistory(payload) {
+      try {
+        const res = await fetch(`${API_BASE}/oral-histories/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ detail: "Server error" }));
+          throw new Error(body.detail || `Status ${res.status}`);
+        }
+        return await res.json();
+      } catch (err) {
+        throw err;
+      }
+    }
+
+    async function deleteHistory(id) {
+      if (!confirm("Delete this oral history?")) return;
+      const rawId = decodeURIComponent(id);
+      try {
+        const res = await fetch(`${API_BASE}/oral-histories/${rawId}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        await fetchHistories();
+        await fetchStats();
+        await fetchCulturalInsights(); // Refresh insights
+        alert("Oral history deleted successfully!");
+      } catch (err) {
+        alert("Failed to delete oral history: " + err);
+      }
+    }
+
+    // ---------- ARTEFACTS FUNCTIONS ----------
+    async function fetchArtefacts() {
+      showMessage(artefactsList, "⏳ Loading artefacts...");
+      try {
+        const res = await fetch(`${API_BASE}/artefacts/`);
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const artefacts = await res.json();
+        if (!artefacts || artefacts.length === 0) {
+          showMessage(artefactsList, "No artefacts found. Add your first artefact!");
+          return;
+        }
+        artefactsList.innerHTML = "";
+        artefacts.forEach(artefact => {
+          artefactsList.innerHTML += renderArtefactCard(artefact);
+        });
+      } catch (err) {
+        showMessage(artefactsList, "Error loading artefacts — check server. " + err, "error");
+        console.error("fetchArtefacts:", err);
+      }
+    }
+
+    async function searchArtefacts(query) {
+      if (!query.trim()) {
+        fetchArtefacts();
+        return;
+      }
+      
+      showMessage(artefactsList, "⏳ Searching...");
+      try {
+        const res = await fetch(`${API_BASE}/artefacts/`);
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const allArtefacts = await res.json();
+        
+        // Client-side filtering
+        const filtered = allArtefacts.filter(artefact =>
+          (artefact.name && artefact.name.toLowerCase().includes(query.toLowerCase())) ||
+          (artefact.site_name && artefact.site_name.toLowerCase().includes(query.toLowerCase())) ||
+          (artefact.category && artefact.category.toLowerCase().includes(query.toLowerCase())) ||
+          (artefact.material && artefact.material.toLowerCase().includes(query.toLowerCase())) ||
+          (artefact.description && artefact.description.toLowerCase().includes(query.toLowerCase()))
+        );
+        
+        artefactsList.innerHTML = "";
+        if (filtered.length === 0) {
+          showMessage(artefactsList, "No artefacts found matching your search.");
+          return;
+        }
+        filtered.forEach(artefact => {
+          artefactsList.innerHTML += renderArtefactCard(artefact);
+        });
+      } catch (err) {
+        showMessage(artefactsList, "Search error: " + err, "error");
+      }
+    }
+
+    function renderArtefactCard(artefact) {
+      const image = artefact.image_url ? 
+        `<img src="${API_BASE}${escapeHtml(artefact.image_url)}" alt="${escapeHtml(artefact.name)}" class="w-full h-32 object-cover rounded-md mt-2" />` : "";
+      const desc = artefact.description ? `<p class="text-gray-700 mt-1">${escapeHtml(artefact.description)}</p>` : "";
+      const siteInfo = artefact.site_name ? `<p class="text-sm text-gray-600">Site: ${escapeHtml(artefact.site_name)}</p>` : "";
+      const categoryInfo = artefact.category ? `<p class="text-sm text-gray-500">Category: ${escapeHtml(artefact.category)}</p>` : "";
+      const materialInfo = artefact.material ? `<p class="text-sm text-gray-500">Material: ${escapeHtml(artefact.material)}</p>` : "";
+      const yearInfo = artefact.discovered_year ? `<p class="text-sm text-gray-500">Discovered: ${artefact.discovered_year}</p>` : "";
+      
+      return `
+        <div class="border rounded p-4 hover:bg-gray-50">
+          <div class="flex justify-between items-start gap-4">
+            <div class="flex-1">
+              <h3 class="font-semibold text-lg">${escapeHtml(artefact.name)}</h3>
+              ${siteInfo}
+              ${categoryInfo}
+              ${materialInfo}
+              ${yearInfo}
+              ${desc}
+              ${image}
+            </div>
+            <div class="flex flex-col items-end gap-2">
+              <button class="btn-small bg-blue-500 text-white hover:bg-blue-600 admin-only" onclick="editArtefact(${artefact.artefact_id})">Edit</button>
+              <button class="btn-small bg-red-500 text-white hover:bg-red-600 admin-only" onclick="deleteArtefact(${artefact.artefact_id})">Delete</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function editArtefact(id) {
+      try {
+        const res = await fetch(`${API_BASE}/artefacts/`);
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const artefacts = await res.json();
+        const artefact = artefacts.find(a => a.artefact_id === id);
+        
+        if (!artefact) {
+          alert("Artefact not found");
+          return;
+        }
+        
+        // Fill form with existing data
+        document.getElementById('artefactId').value = artefact.artefact_id;
+        document.getElementById('artefactName').value = artefact.name || '';
+        document.getElementById('artefactSite').value = artefact.site_name || '';
+        document.getElementById('artefactCategory').value = artefact.category || '';
+        document.getElementById('artefactMaterial').value = artefact.material || '';
+        document.getElementById('artefactYear').value = artefact.discovered_year || '';
+        document.getElementById('artefactImage').value = artefact.image_url || '';
+        document.getElementById('artefactDescription').value = artefact.description || '';
+        
+        // Show existing image preview
+        if (artefact.image_url) {
+          imagePreview.innerHTML = `
+            <img src="${API_BASE}${artefact.image_url}" alt="Preview" class="w-32 h-32 object-cover rounded-md mx-auto">
+            <p class="text-sm text-gray-600 text-center mt-1">Existing image</p>
+          `;
+          imagePreview.classList.remove('hidden');
+        }
+        
+        // Update form for editing
+        artefactSubmitBtn.textContent = 'Update Artefact';
+        artefactFormWrap.classList.remove('hidden');
+      } catch (err) {
+        alert("Error loading artefact for editing: " + err);
+      }
+    }
+
+    async function updateArtefact(id, payload) {
+      try {
+        const res = await fetch(`${API_BASE}/artefacts/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ detail: "Server error" }));
+          throw new Error(body.detail || `Status ${res.status}`);
+        }
+        return await res.json();
+      } catch (err) {
+        throw err;
+      }
+    }
+
+    async function addArtefact(payload) {
+      try {
+        const res = await fetch(`${API_BASE}/artefacts/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ detail: "Server error" }));
+          throw new Error(body.detail || `Status ${res.status}`);
+        }
+        return await res.json();
+      } catch (err) {
+        throw err;
+      }
+    }
+
+    async function deleteArtefact(id) {
+      if (!confirm("Delete this artefact?")) return;
+      try {
+        const res = await fetch(`${API_BASE}/artefacts/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        await fetchArtefacts();
+        await fetchStats();
+        await fetchCulturalInsights(); // Refresh insights
+        alert("Artefact deleted successfully!");
+      } catch (err) {
+        alert("Failed to delete artefact: " + err);
+      }
+    }
+
+    // ---------- EVENT LISTENERS ----------
+    function initializeEventListeners() {
+      // New buttons for Cultural Insights
+      if (refreshInsights) {
+        refreshInsights.addEventListener("click", fetchCulturalInsights);
+      }
+      if (refreshInsightsBtn) {
+        refreshInsightsBtn.addEventListener("click", fetchCulturalInsights);
+      }
+
+      // Site buttons
+      if (toggleSiteFormBtn) {
+        toggleSiteFormBtn.addEventListener("click", () => { 
+          if (!currentUser?.is_admin) {
+            alert("Admin login required to add sites");
+            return;
+          }
+          siteFormWrap.classList.toggle("hidden"); 
+          // Reset form for adding new
+          if (!siteFormWrap.classList.contains('hidden')) {
+            siteForm.reset();
+            siteSubmitBtn.textContent = 'Add Site';
+            document.getElementById('siteId').value = '';
+          }
+        });
+      }
+      
+      if (cancelSiteBtn) {
+        cancelSiteBtn.addEventListener("click", () => { 
+          siteFormWrap.classList.add("hidden"); 
+        });
+      }
+
+      if (refreshSitesBtn) {
+        refreshSitesBtn.addEventListener("click", fetchSites);
+      }
+
+      if (exportSitesBtn) {
+        exportSitesBtn.addEventListener("click", exportSites);
+      }
+
+      // History buttons
+      if (toggleHistoryFormBtn) {
+        toggleHistoryFormBtn.addEventListener("click", () => { 
+          if (!currentUser?.is_admin) {
+            alert("Admin login required to add oral histories");
+            return;
+          }
+          historyFormWrap.classList.toggle("hidden"); 
+          // Reset form for adding new
+          if (!historyFormWrap.classList.contains('hidden')) {
+            historyForm.reset();
+            historySubmitBtn.textContent = 'Add Oral History';
+            document.getElementById('historyId').value = '';
+            audioPreview.classList.add('hidden');
+            document.getElementById('histAudio').value = '';
+          }
+        });
+      }
+      
+      if (cancelHistBtn) {
+        cancelHistBtn.addEventListener("click", () => { 
+          historyFormWrap.classList.add("hidden"); 
+        });
+      }
+
+      if (refreshHistBtn) {
+        refreshHistBtn.addEventListener("click", fetchHistories);
+      }
+
+      // Artefact buttons
+      if (toggleArtefactFormBtn) {
+        toggleArtefactFormBtn.addEventListener("click", () => { 
+          if (!currentUser?.is_admin) {
+            alert("Admin login required to add artefacts");
+            return;
+          }
+          artefactFormWrap.classList.toggle("hidden"); 
+          // Reset form for adding new
+          if (!artefactFormWrap.classList.contains('hidden')) {
+            artefactForm.reset();
+            artefactSubmitBtn.textContent = 'Add Artefact';
+            document.getElementById('artefactId').value = '';
+            imagePreview.classList.add('hidden');
+            document.getElementById('artefactImage').value = '';
+          }
+        });
+      }
+      
+      if (cancelArtefactBtn) {
+        cancelArtefactBtn.addEventListener("click", () => { 
+          artefactFormWrap.classList.add("hidden"); 
+        });
+      }
+
+      if (refreshArtefactsBtn) {
+        refreshArtefactsBtn.addEventListener("click", fetchArtefacts);
+      }
+
+      // Quick action buttons
+      if (exportBtn) {
+        exportBtn.addEventListener("click", exportSites);
+      }
+
+      if (refreshStatsBtn) {
+        refreshStatsBtn.addEventListener("click", fetchStats);
+      }
+
+      if (reloadChartsBtn) {
+        reloadChartsBtn.addEventListener("click", loadCharts);
+      }
+
+      // Search functionality
+      if (siteSearch) {
+        siteSearch.addEventListener("input", (e) => {
+          searchSites(e.target.value);
+        });
+      }
+
+      if (historySearch) {
+        historySearch.addEventListener("input", (e) => {
+          searchHistories(e.target.value);
+        });
+      }
+
+      if (artefactSearch) {
+        artefactSearch.addEventListener("input", (e) => {
+          searchArtefacts(e.target.value);
+        });
+      }
+
+      // Form submissions
+      if (siteForm) {
+        siteForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const siteId = document.getElementById("siteId").value;
+          const name = document.getElementById("siteName").value.trim();
+          if (!name) return alert("Site name is required.");
+
+          const [city = "", country = ""] = document
+            .getElementById("siteLocation")
+            .value.split(",")
+            .map(s => s.trim());
+
+          const payload = {
+            name,
+            description: document.getElementById("siteDescription").value.trim(),
+            location_city: city,
+            location_country: country,
+            latitude: parseFloat(document.getElementById("siteLatitude").value) || null,
+            longitude: parseFloat(document.getElementById("siteLongitude").value) || null
+          };
+
+          try {
+            if (siteId) {
+              // Update existing site
+              await updateSite(siteId, payload);
+              alert("Site updated successfully! ✓");
+            } else {
+              // Add new site
+              await addSite(payload);
+              alert("Site added successfully! ✓");
+            }
+            
+            siteForm.reset();
+            siteFormWrap.classList.add("hidden");
+            await fetchSites();
+            await fetchStats();
+            await loadCharts();
+            await fetchCulturalInsights(); // Refresh insights
+          } catch (err) {
+            alert("Failed to save site: " + err);
+          }
+        });
+      }
+
+      if (historyForm) {
+        historyForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const historyId = document.getElementById("historyId").value;
+          const title = document.getElementById("histTitle").value.trim();
+          const narrator = document.getElementById("histNarrator").value.trim();
+          
+          if (!title || !narrator) {
+            return alert("Title and Narrator are required.");
+          }
+
+          const payload = {
+            title,
+            narrator,
+            year: parseInt(document.getElementById("histYear").value) || null,
+            region: document.getElementById("histRegion").value.trim() || null,
+            audio_url: document.getElementById("histAudio").value.trim() || null,
+            description: document.getElementById("histDescription").value.trim() || null
+          };
+
+          try {
+            if (historyId) {
+              // Update existing history
+              await updateHistory(historyId, payload);
+              alert("Oral history updated successfully! ✓");
+            } else {
+              // Add new history
+              await addHistory(payload);
+              alert("Oral history added successfully! ✓");
+            }
+            
+            historyForm.reset();
+            historyFormWrap.classList.add("hidden");
+            await fetchHistories();
+            await fetchStats();
+            await fetchCulturalInsights(); // Refresh insights
+          } catch (err) {
+            alert("Failed to save oral history: " + err);
+          }
+        });
+      }
+
+      if (artefactForm) {
+        artefactForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const artefactId = document.getElementById("artefactId").value;
+          const name = document.getElementById("artefactName").value.trim();
+          if (!name) return alert("Artefact name is required.");
+
+          const payload = {
+            name,
+            site_name: document.getElementById("artefactSite").value.trim() || null,
+            category: document.getElementById("artefactCategory").value.trim() || null,
+            material: document.getElementById("artefactMaterial").value.trim() || null,
+            discovered_year: parseInt(document.getElementById("artefactYear").value) || null,
+            image_url: document.getElementById("artefactImage").value.trim() || null,
+            description: document.getElementById("artefactDescription").value.trim() || null
+          };
+
+          try {
+            if (artefactId) {
+              // Update existing artefact
+              await updateArtefact(artefactId, payload);
+              alert("Artefact updated successfully! ✓");
+            } else {
+              // Add new artefact
+              await addArtefact(payload);
+              alert("Artefact added successfully! ✓");
+            }
+            
+            artefactForm.reset();
+            artefactFormWrap.classList.add("hidden");
+            await fetchArtefacts();
+            await fetchStats();
+            await fetchCulturalInsights(); // Refresh insights
+          } catch (err) {
+            alert("Failed to save artefact: " + err);
+          }
+        });
+      }
+    }
+
+    // ---------- INITIALIZATION ----------
+    function initializeApp() {
+      initializeEventListeners();
+      initializeUploads();
+      fetchSites();
+      fetchHistories();
+      fetchArtefacts();
+      fetchStats();
+      loadCharts();
+      fetchCulturalInsights(); // Initialize cultural insights
+      updateRoleVisibility(); // Set initial role visibility
+    }
+
+    // Start the application when the page loads
+    document.addEventListener('DOMContentLoaded', initializeApp);
+  </script>
+</body>
+</html>

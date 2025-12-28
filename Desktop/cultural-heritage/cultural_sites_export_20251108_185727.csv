@@ -1,0 +1,3 @@
+id,name,description,city,country,latitude,longitude,created_at,updated_at
+1,Rajgad,A fort,Raigad,,10.0,10.0,2025-11-08T12:52:43.043569+00:00,2025-11-08T12:49:28.191275+00:00
+2,Ajanta Caves,Buddhist Caves,Aurangabad,India,10.0,10.0,2025-11-08T12:54:24.454496+00:00,
